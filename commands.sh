@@ -96,8 +96,8 @@ for (i in names(table(byID))){
 
 
 
-docker run --rm --gpus all --volume testIn:/workdir --volume testOut:/outputdir \
-    -w /workdir \
+docker run --rm --gpus all --volume /testIn:/workdir --volume /testOut:/outputdir \
+    --workdir /work \
     nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
     pbrun rna_fq2bam \
     --in-fq /workdir/*R1* /workdir/*R2* \
@@ -108,7 +108,34 @@ docker run --rm --gpus all --volume testIn:/workdir --volume testOut:/outputdir 
     --read-files-command zcat
 
 
+
+for i in *_R1.fastq.gz; do
+	j=${i/_R1/_R2}
+	k=${i/_R1.fastq.gz/}	
+time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
+    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
+    pbrun rna_fq2bam \
+    --in-fq /workdir/$i /workdir/$j \
+    --output-dir /outputdir/ \
+	--genome-lib-dir /workdir/genome2/star/ \
+    --ref /workdir/genome2/GCA_000001405.15_GRCh38_full_analysis_set.fna \
+    --out-bam /outputdir/$k.bam \
+    --read-files-command zcat \
+	--num-threads 56 \
+	--two-pass-mode Basic
+done
+
+
+
 gshawli:ifp
 
 tmux
 while read line; do echo $line; sudo pigz -p 25 $line; done <RBtest1
+
+
+
+
+tmux
+mamba activate ncbi
+
+while read line; do echo $line; fasterq-dump -3 -m 1000 -e 10 $line; pigz -p *fastq; echo $line >> done.ae; done <../split_PRJNA577693ae
