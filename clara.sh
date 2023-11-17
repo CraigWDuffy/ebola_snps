@@ -24,7 +24,6 @@ time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/output
     --read-files-command zcat \
 	--num-threads 100 \
 	--two-pass-mode Basic
-done
 
 # The version of clara parabricks with splitncigar is no longer available, using gatk for next step
 mamba activate gatk
@@ -53,4 +52,5 @@ time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/output
 	--num-htvc-threads 100 \
 	--rna
 
+rm -f *bam*
 done <all.samples
