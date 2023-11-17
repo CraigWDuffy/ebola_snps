@@ -96,34 +96,121 @@ for (i in names(table(byID))){
 
 
 
-docker run --rm --gpus all --volume /testIn:/workdir --volume /testOut:/outputdir \
-    --workdir /work \
-    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
-    pbrun rna_fq2bam \
-    --in-fq /workdir/*R1* /workdir/*R2* \
-    --genome-lib-dir /workdir/genome/ \
-    --output-dir /outputdir/ \
-    --ref /workdir/GCA_000001405.15_GRCh38_full_analysis_set.fna \
-    --out-bam /outputdir/test1.bam \
-    --read-files-command zcat
 
 
 
-for i in *_R1.fastq.gz; do
-	j=${i/_R1/_R2}
-	k=${i/_R1.fastq.gz/}	
+mamba activate clara
+time STAR --runThreadN 150 --runMode genomeGenerate --genomeDir . --genomeFastaFiles Homo_sapiens_assembly19_1000genomes_decoy.fasta --sjdbGTFfile star.gencode.v19.transcripts.patched_contigs.gtf --sjdbOverhang 100
+
+#Running from ~clara_parabricks
+for i in SRR10307483_1.fastq.gz; do
+	j=${i/_1.fastq.gz/_2.fastq.gz}
+	k=${i/_1.fastq.gz/}	
 time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
     nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
     pbrun rna_fq2bam \
     --in-fq /workdir/$i /workdir/$j \
     --output-dir /outputdir/ \
-	--genome-lib-dir /workdir/genome2/star/ \
-    --ref /workdir/genome2/GCA_000001405.15_GRCh38_full_analysis_set.fna \
+	--genome-lib-dir /workdir/testIn/GATK_resources/ \
+    --ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
     --out-bam /outputdir/$k.bam \
     --read-files-command zcat \
-	--num-threads 56 \
+	--num-threads 100 \
 	--two-pass-mode Basic
 done
+
+# The version of clara parabricks with splitncigar is no longer available, using gatk for next step
+mamba activate gatk
+time gatk --java-options "-Xmx100G" SplitNCigarReads -I SRR10307483.bam -O SRR10307483.sncr.bam -R testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta
+
+
+time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
+    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
+	pbrun bqsr \
+	--ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
+	--in-bam /workdir/SRR10307483.sncr.bam \
+	--knownSites /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.known_indels.vcf \
+	--knownSites /workdir/testIn/GATK_resources/Mills_and_1000G_gold_standard.indels.b37.sites.vcf \
+	--out-recal-file /outputdir/SRR10307483.recal
+
+# Don't need this step as can be run during haplotype caller
+#time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
+#    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
+#	pbrun applybqsr \
+#	--ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
+#	--in-bam /workdir/SRR10307483.sncr.bam \
+#	--in-recal-file /workdir/SRR10307483.recal \
+#	--out-bam /outputdir/SRR10307483.recal.bam \
+#	--num-threads 100
+
+time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
+    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
+	pbrun haplotypecaller \
+	--gvcf \
+	--ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
+	--in-bam /workdir/SRR10307483.recal.bam \
+	--in-recal-file /workdir/SRR10307483.recal \
+	--out-variants /outputdir/SRR10307483.g.vcf \
+	--num-htvc-threads 100 \
+	--rna
+
+
+
+
+
+for i in SRR10307489_1.fastq.gz; do
+	j=${i/_1.fastq.gz/_2.fastq.gz}
+	k=${i/_1.fastq.gz/}	
+time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
+    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
+    pbrun rna_fq2bam \
+    --in-fq /workdir/$i /workdir/$j \
+    --output-dir /outputdir/ \
+	--genome-lib-dir /workdir/testIn/GATK_resources/ \
+    --ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
+    --out-bam /outputdir/$k.bam \
+    --read-files-command zcat \
+	--num-threads 100 \
+	--two-pass-mode Basic
+done
+
+# The version of clara parabricks with splitncigar is no longer available, using gatk for next step
+mamba activate gatk
+time gatk --java-options "-Xmx100G" SplitNCigarReads -I SRR10307489.bam -O SRR10307489.sncr.bam -R testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta
+
+
+time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
+    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
+	pbrun bqsr \
+	--ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
+	--in-bam /workdir/SRR10307489.sncr.bam \
+	--knownSites /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.known_indels.vcf \
+	--knownSites /workdir/testIn/GATK_resources/Mills_and_1000G_gold_standard.indels.b37.sites.vcf \
+	--out-recal-file /outputdir/SRR10307489.recal
+
+time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
+    nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
+	pbrun haplotypecaller \
+	--gvcf \
+	--ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
+	--in-bam /workdir/SRR10307489.sncr.bam \
+	--in-recal-file /workdir/SRR10307489.recal \
+	--out-variants /outputdir/SRR10307489.g.vcf \
+	--num-htvc-threads 100 \
+	--rna
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -132,3 +219,22 @@ done
 
 mamba activate ncbi
 while read line; do echo $line; fasterq-dump -3 -m 1000 -e 10 $line; pigz -p 10 *fastq; echo $line >> done.ae; done <../split_PRJNA577693ae
+
+
+
+# Notes from the gatk best references github page which list the location of the various reference, known sites and gtf files. May be out of date
+
+"##_COMMENT2": "REFERENCE FILES",
+ "RNAseq.refFasta": https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Homo_sapiens_assembly19_1000genomes_decoy.fasta
+ "RNAseq.refFastaIndex": https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Homo_sapiens_assembly19_1000genomes_decoy.fasta.fai
+ "RNAseq.refDict": https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Homo_sapiens_assembly19_1000genomes_decoy.dict
+
+ "##_COMMENT4": "RESOURCE FILES",
+ "RNAseq.dbSnpVcf": https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Homo_sapiens_assembly19_1000genomes_decoy.dbsnp138.vcf
+ "RNAseq.dbSnpVcfIndex" https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Homo_sapiens_assembly19_1000genomes_decoy.dbsnp138.vcf.idx
+ 
+ "RNAseq.knownVcfs": https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Mills_and_1000G_gold_standard.indels.b37.sites.vcf https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Homo_sapiens_assembly19_1000genomes_decoy.known_indels.vcf
+
+ "RNAseq.knownVcfsIndices":    https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Mills_and_1000G_gold_standard.indels.b37.sites.vcf.idx https://storage.googleapis.com/gcp-public-data--broad-references/Homo_sapiens_assembly19_1000genomes_decoy/Homo_sapiens_assembly19_1000genomes_decoy.known_indels.vcf.idx
+
+ "RNAseq.annotationsGTF": https://storage.googleapis.com/gatk-test-data/intervals/star.gencode.v19.transcripts.patched_contigs.gtf
