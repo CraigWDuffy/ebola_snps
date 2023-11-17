@@ -127,15 +127,8 @@ done
 
 
 
-gshawli:ifp
-
-tmux
-while read line; do echo $line; sudo pigz -p 25 $line; done <RBtest1
 
 
 
-
-tmux
 mamba activate ncbi
-
-while read line; do echo $line; fasterq-dump -3 -m 1000 -e 10 $line; pigz -p *fastq; echo $line >> done.ae; done <../split_PRJNA577693ae
+while read line; do echo $line; fasterq-dump -3 -m 1000 -e 10 $line; pigz -p 10 *fastq; echo $line >> done.ae; done <../split_PRJNA577693ae
