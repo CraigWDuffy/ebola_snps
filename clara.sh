@@ -1,3 +1,5 @@
+!/bin/bash -i
+
 #Start of script to automate SNP calling using clara parabricks gpu accelerated version of gatk - must be run on a server with active gpu for which docker and clara parabricks have already been set up. For current purposes use borgcube.
 
 # Set the script running from the directory with the fastq files. For now the location of all of the other files are assumed to be in a subdirectory in that location called testIn. Will update later.
@@ -53,4 +55,7 @@ time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/output
 	--rna
 
 rm -f *bam*
+rm -f *bai*
+rm -f *recal
+
 done <all.samples
