@@ -1,4 +1,4 @@
-!/bin/bash -i
+#!/usr/bin/bash -i
 
 #Start of script to automate SNP calling using clara parabricks gpu accelerated version of gatk - must be run on a server with active gpu for which docker and clara parabricks have already been set up. For current purposes use borgcube.
 
@@ -11,6 +11,7 @@ for s in *_1.fastq.gz; do
 echo $s >> all.samples
 done
 
+mamba activate clara
 while read i; do
 	echo "Starting sample" $i "- rna_fq2bam"
 	j=${i/_1.fastq.gz/_2.fastq.gz}
@@ -24,14 +25,15 @@ time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/output
     --ref /workdir/testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta \
     --out-bam /outputdir/$k.bam \
     --read-files-command zcat \
-	--num-threads 100 \
+	--num-threads 150 \
 	--two-pass-mode Basic
 
 # The version of clara parabricks with splitncigar is no longer available, using gatk for next step
 mamba activate gatk
 echo "SplitNCigarReads"
-time gatk --java-options "-Xmx100G" SplitNCigarReads -I $k.bam -O $k.sncr.bam -R testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta
+time gatk --java-options "-Xmx750G" SplitNCigarReads -I $k.bam -O $k.sncr.bam -R testIn/GATK_resources/Homo_sapiens_assembly19_1000genomes_decoy.fasta
 
+mamba activate clara
 echo "BQSR"
 time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/outputdir \
     nvcr.io/nvidia/clara/clara-parabricks:4.0.0-1 \
@@ -51,7 +53,7 @@ time docker run --rm --gpus all --volume $(pwd):/workdir --volume $(pwd):/output
 	--in-bam /workdir/$k.sncr.bam \
 	--in-recal-file /workdir/$k.recal \
 	--out-variants /outputdir/$k.g.vcf \
-	--num-htvc-threads 100 \
+	--num-htvc-threads 50 \
 	--rna
 
 rm -f *bam*
